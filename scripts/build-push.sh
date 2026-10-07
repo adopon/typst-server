@@ -33,11 +33,13 @@ VERSION_FILE="$(tr -d '[:space:]' < "$DIR/VERSION" 2>/dev/null || true)"
 TAG="${1:-${TAG:-${VERSION_FILE:-$(git describe --tags --always --dirty 2>/dev/null || echo latest)}}}"
 PUSH="${PUSH:-1}"
 
-# Warn when the working copy was tagged but VERSION disagrees (release.sh
-# keeps them in sync; manual tags can drift).
+# Warn when VERSION and the git tag on HEAD are out of sync (release.sh keeps
+# them together; this catches post-release drift and manual tags).
 if [[ -n "${VERSION_FILE}" ]]; then
     exact_tag="$(git describe --tags --exact-match 2>/dev/null || true)"
-    if [[ -n "${exact_tag}" && "${exact_tag}" != "v${VERSION_FILE}" ]]; then
+    if [[ -z "${exact_tag}" ]]; then
+        echo "==> note: HEAD is not tagged; building ${IMAGE}:${TAG} from $(git describe --tags --always --dirty 2>/dev/null || echo WORKTREE)" >&2
+    elif [[ "${exact_tag}" != "v${VERSION_FILE}" ]]; then
         echo "==> warning: VERSION (${VERSION_FILE}) does not match git tag ${exact_tag}" >&2
     fi
 fi
