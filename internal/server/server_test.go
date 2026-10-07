@@ -31,7 +31,7 @@ func (f *fakeRenderer) Render(req render.Request) ([]byte, error) {
 
 func TestHandleRenderJSON(t *testing.T) {
 	fake := &fakeRenderer{pdf: []byte("PDF-BYTES")}
-	s := New(fake, "typst test", 1<<20)
+	s := New(fake, Options{TypstVersion: "typst test", MaxBodyBytes: 1 << 20})
 
 	b64 := base64.StdEncoding.EncodeToString([]byte(`{"n":1}`))
 	req := jsonRequest(`{"template":"= hi","files":{"/data.json":"` + b64 + `"}}`)
@@ -54,7 +54,7 @@ func TestHandleRenderJSON(t *testing.T) {
 
 func TestHandleRenderMultipart(t *testing.T) {
 	fake := &fakeRenderer{pdf: []byte("PDF-BYTES")}
-	s := New(fake, "typst test", 1<<20)
+	s := New(fake, Options{TypstVersion: "typst test", MaxBodyBytes: 1 << 20})
 
 	req := multipartRequest(t, func(mw *multipart.Writer) {
 		_ = mw.WriteField("template", "= hi")
@@ -76,7 +76,7 @@ func TestHandleRenderMultipart(t *testing.T) {
 }
 
 func TestHandleRenderRequiresTemplate(t *testing.T) {
-	s := New(&fakeRenderer{}, "", 1<<20)
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 1 << 20})
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, jsonRequest(`{"files":{}}`))
 
@@ -96,7 +96,7 @@ func TestHandleRenderErrorStatuses(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			s := New(&fakeRenderer{err: tc.err}, "", 1<<20)
+			s := New(&fakeRenderer{err: tc.err}, Options{MaxBodyBytes: 1 << 20})
 			rec := httptest.NewRecorder()
 			s.Handler().ServeHTTP(rec, jsonRequest(`{"template":"= hi"}`))
 
@@ -115,7 +115,7 @@ func TestHandleRenderErrorStatuses(t *testing.T) {
 }
 
 func TestHandleRenderRejectsOversizeBody(t *testing.T) {
-	s := New(&fakeRenderer{}, "", 16) // 16-byte cap
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 16}) // 16-byte cap
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, jsonRequest(`{"template":"longer than sixteen bytes"}`))
 
@@ -125,7 +125,11 @@ func TestHandleRenderRejectsOversizeBody(t *testing.T) {
 }
 
 func TestHealthAndVersion(t *testing.T) {
-	s := New(&fakeRenderer{}, "typst 0.15.1", 1<<20)
+	s := New(&fakeRenderer{}, Options{
+		ServiceVersion: "1.2.3",
+		TypstVersion:   "typst 0.15.1",
+		MaxBodyBytes:   1 << 20,
+	})
 
 	health := httptest.NewRecorder()
 	s.Handler().ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/health", nil))
@@ -139,7 +143,7 @@ func TestHealthAndVersion(t *testing.T) {
 	if err := json.Unmarshal(version.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["service"] != Name || body["typst"] != "typst 0.15.1" {
+	if body["service"] != Name || body["typst"] != "typst 0.15.1" || body["version"] != "1.2.3" {
 		t.Fatalf("version = %v", body)
 	}
 }

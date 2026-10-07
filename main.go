@@ -16,6 +16,10 @@ import (
 	"ponado-typst/internal/server"
 )
 
+// version is the ponado-typst release; set via
+// -ldflags "-X main.version=..." at image build time.
+var version = "dev"
+
 func main() {
 	cfg, err := config.FromEnv()
 	if err != nil {
@@ -37,9 +41,13 @@ func main() {
 		log.Printf("warning: could not determine typst version")
 	}
 
-	srv := server.New(renderer, typstVersion, cfg.MaxBodyBytes)
+	srv := server.New(renderer, server.Options{
+		ServiceVersion: version,
+		TypstVersion:   typstVersion,
+		MaxBodyBytes:   cfg.MaxBodyBytes,
+	})
 	addr := "0.0.0.0:" + cfg.Port
-	log.Printf("%s listening on %s (typst: %s)", server.Name, addr, typstVersion)
+	log.Printf("%s %s listening on %s (typst: %s)", server.Name, version, addr, typstVersion)
 	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
 		log.Fatal(err)
 	}

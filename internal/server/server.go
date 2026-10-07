@@ -29,19 +29,36 @@ type Renderer interface {
 	Render(render.Request) ([]byte, error)
 }
 
-// Server serves the wire contract for one renderer and configuration.
-type Server struct {
-	renderer     Renderer
-	typstVersion string
-	maxBodyBytes int64
+// Options configures a Server.
+type Options struct {
+	// ServiceVersion is the ponado-typst release (set at build time via
+	// -ldflags "-X main.version=..."); informational only.
+	ServiceVersion string
+	// TypstVersion is the engine banner; informational (/version, logs).
+	TypstVersion string
+	// MaxBodyBytes caps request bodies.
+	MaxBodyBytes int64
 }
 
-// New wires a server. typstVersion is informational (/version, logs only).
-func New(renderer Renderer, typstVersion string, maxBodyBytes int64) *Server {
+// Server serves the wire contract for one renderer and configuration.
+type Server struct {
+	renderer       Renderer
+	serviceVersion string
+	typstVersion   string
+	maxBodyBytes   int64
+}
+
+// New wires a server.
+func New(renderer Renderer, opts Options) *Server {
+	serviceVersion := opts.ServiceVersion
+	if serviceVersion == "" {
+		serviceVersion = "dev"
+	}
 	return &Server{
-		renderer:     renderer,
-		typstVersion: typstVersion,
-		maxBodyBytes: maxBodyBytes,
+		renderer:       renderer,
+		serviceVersion: serviceVersion,
+		typstVersion:   opts.TypstVersion,
+		maxBodyBytes:   opts.MaxBodyBytes,
 	}
 }
 
@@ -100,6 +117,7 @@ func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("content-type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"service": Name,
+		"version": s.serviceVersion,
 		"go":      runtime.Version(),
 		"typst":   s.typstVersion,
 	})

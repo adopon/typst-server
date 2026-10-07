@@ -31,7 +31,7 @@ func multipartRequest(t *testing.T, build func(*multipart.Writer)) *http.Request
 
 func TestDecodeJSONReq(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString([]byte("{}"))
-	s := New(&fakeRenderer{}, "", 1<<20)
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 1 << 20})
 
 	req, err := s.decodeRequest(httptest.NewRecorder(), jsonRequest(
 		`{"template":"= hi","files":{"/data.json":"`+b64+`"},"inputs":{"a":"b"}}`,
@@ -48,7 +48,7 @@ func TestDecodeJSONReq(t *testing.T) {
 }
 
 func TestDecodeJSONReqRejectsBadBase64(t *testing.T) {
-	s := New(&fakeRenderer{}, "", 1<<20)
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 1 << 20})
 	_, err := s.decodeRequest(httptest.NewRecorder(), jsonRequest(
 		`{"template":"= hi","files":{"/data.json":"!!!not-base64"}}`,
 	))
@@ -58,7 +58,7 @@ func TestDecodeJSONReqRejectsBadBase64(t *testing.T) {
 }
 
 func TestDecodeMultipartReq(t *testing.T) {
-	s := New(&fakeRenderer{}, "", 1<<20)
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 1 << 20})
 
 	req := multipartRequest(t, func(mw *multipart.Writer) {
 		_ = mw.WriteField("template", "= hi")
@@ -111,7 +111,7 @@ func TestDecodeMultipartReq(t *testing.T) {
 }
 
 func TestDecodeMultipartRejectsBadInputs(t *testing.T) {
-	s := New(&fakeRenderer{}, "", 1<<20)
+	s := New(&fakeRenderer{}, Options{MaxBodyBytes: 1 << 20})
 
 	req := multipartRequest(t, func(mw *multipart.Writer) {
 		_ = mw.WriteField("template", "= hi")

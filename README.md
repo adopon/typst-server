@@ -32,6 +32,9 @@ main.go                  wiring only (config -> renderer -> server)
 internal/config/         environment parsing
 internal/render/         typst invocation, shadow dirs, timeouts, concurrency
 internal/server/         HTTP handlers + JSON/multipart request decoding
+VERSION                  service version - image tag source of truth
+scripts/build-push.sh    multi-arch image build/push
+scripts/release.sh       bump + commit + tag + push + build
 ```
 
 ## API
@@ -39,7 +42,7 @@ internal/server/         HTTP handlers + JSON/multipart request decoding
 | Method | Path       | Returns                                            |
 | ------ | ---------- | -------------------------------------------------- |
 | GET    | `/health`  | `ok` (plain text)                                  |
-| GET    | `/version` | `{"service","go","typst"}`                         |
+| GET    | `/version` | `{"service","version","go","typst"}`               |
 | POST   | `/render`  | `application/pdf`, or `application/json` on error  |
 
 `POST /render` accepts two encodings of the same request.
@@ -145,11 +148,26 @@ environment:
 When `TYPST_URL` is missing, renders fail at call time with a clear error (the
 module can still be imported at build time).
 
-## Version pinning
+## Versioning & releases
 
-`TYPST_VERSION` (Dockerfile `ARG`, default `0.15.1`) pins the engine. PDF
-output can change between typst releases, so bump it deliberately:
-`TYPST_VERSION=0.16.0 scripts/build-push.sh`.
+Two independent versions:
+
+- **Service version** - `VERSION` at the repo root is the single source of
+  truth. `scripts/build-push.sh` uses it for the image tag (override with
+  `TAG=...`) and bakes it into the binary and the OCI label, so `/version`
+  reports the exact build.
+- **Engine version** - `TYPST_VERSION` (Dockerfile `ARG`, default `0.15.1`)
+  pins the typst CLI. PDF output can change between typst releases, so bump it
+  deliberately: `TYPST_VERSION=0.16.0 scripts/build-push.sh`.
+
+Cut a release - bumps VERSION, commits, tags `vX.Y.Z`, pushes both, then
+builds and pushes the image:
+
+```bash
+scripts/release.sh patch            # or minor|major, or an explicit 1.2.3
+BUILD=0 scripts/release.sh patch    # git release only
+DRY_RUN=1 scripts/release.sh patch  # preview the actions
+```
 
 ## Compatibility
 
