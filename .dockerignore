@@ -1,0 +1,7 @@
+.git
+.gitignore
+fonts
+scripts
+docker-compose.yml
+README.md
+main_test.go

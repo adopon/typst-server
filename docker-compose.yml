@@ -1,0 +1,42 @@
+name: ponado-typst
+
+# Shared Typst -> PDF renderer for ponado apps ("Gotenberg for Typst").
+# One instance serves every project; apps call it over HTTP instead of
+# bundling @myriaddreamin/typst-ts-node-compiler.
+#
+#   docker compose up -d --build
+#
+# Reachable as http://ponado-typst:3100 from the shared `ponado` docker
+# network, or via the published port on the host (TYPST_PORT, default 3100).
+
+services:
+  typst:
+    image: git.ponado.lt/adomas/ponado-typst:latest
+    build: .
+    container_name: ponado-typst
+    restart: unless-stopped
+    ports:
+      - "${TYPST_PORT:-3100}:3100"
+    environment:
+      # Parallel typst compiles. Empty -> NumCPU, <=0 -> unlimited.
+      MAX_CONCURRENCY: ${MAX_CONCURRENCY:-}
+      # Request body cap in MB (base64 shadow files + uploaded fonts).
+      MAX_BODY_MB: ${MAX_BODY_MB:-25}
+      TZ: ${TZ:-Europe/Vilnius}
+    volumes:
+      # Shared font pool: every .ttf/.otf in here is visible to all renders.
+      - ${TYPST_FONTS_DIR:-./fonts}:/app/fonts:ro
+    networks:
+      - ponado
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  # Lookup-or-create by fixed name: other compose projects join with
+  #   networks: { ponado: { external: true } }
+  ponado:
+    name: ponado

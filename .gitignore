@@ -1,0 +1,6 @@
+# local overrides for scripts/build-push.sh
+.env.local
+
+# shared font pool is host-provided, keep the mount point in git
+fonts/*
+!fonts/.gitkeep
