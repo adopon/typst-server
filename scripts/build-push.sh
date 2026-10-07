@@ -9,6 +9,9 @@ set -euo pipefail
 #   PLATFORMS      buildx platforms (default: linux/amd64,linux/arm64)
 #   PUSH           "1" (default) push, "0" build locally with --load
 #   TYPST_VERSION  typst CLI version to bake in (default: Dockerfile pin)
+#   CACHE_FROM     buildx --cache-from (e.g. type=registry,ref=<ref>:buildcache)
+#   CACHE_TO       buildx --cache-to (needs a driver with cache export, e.g.
+#                  docker-container; the default docker driver cannot export)
 #
 # The resolved TAG is also baked into the binary (-X main.version) and the
 # image label, so /version reports the exact release.
@@ -57,6 +60,14 @@ if [[ -n "${TYPST_VERSION:-}" ]]; then
     build_args+=(--build-arg "TYPST_VERSION=${TYPST_VERSION}")
 fi
 
+cache_args=()
+if [[ -n "${CACHE_FROM:-}" ]]; then
+    cache_args+=(--cache-from "${CACHE_FROM}")
+fi
+if [[ -n "${CACHE_TO:-}" ]]; then
+    cache_args+=(--cache-to "${CACHE_TO}")
+fi
+
 tags=(-t "${IMAGE}:${TAG}")
 if [[ "${PUSH}" == "1" ]]; then
     tags+=(-t "${IMAGE}:latest")
@@ -64,10 +75,10 @@ fi
 
 if [[ "${PUSH}" == "1" ]]; then
     echo "==> Building + pushing [${PLATFORMS}] -> ${IMAGE}:${TAG}"
-    docker buildx build --platform "${PLATFORMS}" --push "${build_args[@]}" "${tags[@]}" .
+    docker buildx build --platform "${PLATFORMS}" --push "${build_args[@]}" "${cache_args[@]}" "${tags[@]}" .
 else
     echo "==> Building [${PLATFORMS}] -> ${IMAGE}:${TAG} (local, PUSH=0)"
-    docker buildx build --platform "${PLATFORMS}" --load "${build_args[@]}" "${tags[@]}" .
+    docker buildx build --platform "${PLATFORMS}" --load "${build_args[@]}" "${cache_args[@]}" "${tags[@]}" .
 fi
 
 echo "==> Done: ${IMAGE}:${TAG}"

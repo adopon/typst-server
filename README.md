@@ -21,8 +21,30 @@ curl -s localhost:3100/health         # ok
 Build + push a multi-arch image:
 
 ```bash
-scripts/build-push.sh                 # git.ponado.lt/adomas/ponado-typst:{tag,latest}
+scripts/build-push.sh                 # git.ponado.lt/ponado/ponado-typst:{tag,latest}
 TAG=v0.1.1 PUSH=0 scripts/build-push.sh
+```
+
+## Build caching
+
+Rebuilds are cheap even though the service ships two runtimes (Go + typst):
+
+- the Go stage runs on the **build platform** and cross-compiles for the
+  target (`GOARCH=$TARGETARCH`, CGO off), so the arm64 leg of a multi-arch
+  build never executes the toolchain under QEMU;
+- Go build and module caches are **BuildKit cache mounts**, so a source change
+  recompiles only what changed (measured: ~21s first amd64 build, ~3s rebuild;
+  ~15s first arm64 build, ~2s rebuild);
+- Docker **layer cache** covers base images, fonts and the typst copy.
+
+For CI or several build machines, export the cache to the registry (needs a
+`docker-container` builder - the default docker driver cannot export caches):
+
+```bash
+docker buildx create --name ponado --driver docker-container --use
+CACHE_TO=type=registry,ref=git.ponado.lt/ponado/ponado-typst:buildcache,mode=max \
+CACHE_FROM=type=registry,ref=git.ponado.lt/ponado/ponado-typst:buildcache \
+  scripts/build-push.sh
 ```
 
 ## Layout

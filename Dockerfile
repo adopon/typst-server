@@ -9,15 +9,23 @@ ARG TYPST_VERSION=0.15.1
 # Service release tag; scripts/build-push.sh passes VERSION (from ./VERSION).
 ARG VERSION=dev
 
-FROM golang:1.24-alpine AS builder
+# The handler cross-compiles for the target (CGO off, pure Go), so foreign
+# archs need no QEMU emulation: on an amd64 host an arm64 image compiles
+# natively for arm64 instead of running the whole toolchain under emulation.
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION
 WORKDIR /app
 COPY go.mod ./
 COPY main.go ./
 COPY internal ./internal
-# build FOR the target arch (no --platform=$BUILDPLATFORM): cross-arch binaries
-# from a foreign build platform produce go "exec format" traps at runtime.
-RUN CGO_ENABLED=0 go build -trimpath \
+# Cache mounts: repeated builds reuse the Go build cache (the stdlib compile
+# is the expensive part) and the module cache, instead of starting cold every
+# time a source file changes.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
     -o ponado-typst .
 
