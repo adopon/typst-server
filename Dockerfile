@@ -9,7 +9,9 @@ ARG TYPST_VERSION=0.15.1
 
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY go.mod main.go ./
+COPY go.mod ./
+COPY main.go ./
+COPY internal ./internal
 # build FOR the target arch (no --platform=$BUILDPLATFORM): cross-arch binaries
 # from a foreign build platform produce go "exec format" traps at runtime.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o ponado-typst .

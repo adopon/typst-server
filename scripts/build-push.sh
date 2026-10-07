@@ -22,7 +22,7 @@ set -a
 source "$DIR/.env.local" 2>/dev/null || true
 set +a
 
-IMAGE="${IMAGE:-git.ponado.lt/adomas/ponado-typst}"
+IMAGE="${IMAGE:-git.ponado.lt/ponado/ponado-typst}"
 TAG="${1:-${TAG:-$(git describe --tags --always --dirty 2>/dev/null || echo latest)}}"
 PUSH="${PUSH:-1}"
 

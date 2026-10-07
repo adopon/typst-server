@@ -1,7 +1,6 @@
-package main
+package render
 
 import (
-	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,29 +37,42 @@ func writeStub(t *testing.T, script string) string {
 	return path
 }
 
-func TestRenderWritesPdf(t *testing.T) {
-	t.Setenv("TYPST_BIN", writeStub(t, `echo -n "PDF-BYTES" > out.pdf`))
+func newTestRenderer(t *testing.T, script string) *Renderer {
+	t.Helper()
+	r, err := New(writeStub(t, script), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
 
-	pdf, err := render(renderReq{Template: "= hi"})
+func TestNewRejectsMissingBinary(t *testing.T) {
+	if _, err := New("ponado-typst-definitely-missing", 0); err == nil {
+		t.Fatal("expected an error for a missing typst binary")
+	}
+}
+
+func TestRenderWritesPdf(t *testing.T) {
+	r := newTestRenderer(t, `echo -n "PDF-BYTES" > out.pdf`)
+
+	pdf, err := r.Render(Request{Template: "= hi"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(pdf) != "PDF-BYTES" {
-		t.Fatalf("render() = %q, want %q", pdf, "PDF-BYTES")
+		t.Fatalf("Render() = %q, want %q", pdf, "PDF-BYTES")
 	}
 }
 
 func TestRenderPassesFontPathsAndInputs(t *testing.T) {
 	argsFile := filepath.Join(t.TempDir(), "args.txt")
-	t.Setenv("TYPST_BIN", writeStub(t, `printf '%s\n' "$@" > "$ARGS_FILE"; echo -n pdf > out.pdf`))
 	t.Setenv("ARGS_FILE", argsFile)
+	r := newTestRenderer(t, `printf '%s\n' "$@" > "$ARGS_FILE"; echo -n pdf > out.pdf`)
 
-	font := base64.StdEncoding.EncodeToString([]byte("fake-font"))
-	data := base64.StdEncoding.EncodeToString([]byte("{}"))
-	_, err := render(renderReq{
+	_, err := r.Render(Request{
 		Template:  "= hi",
-		Files:     map[string]string{"/.fonts/test.ttf": font, "/data.json": data},
-		FontPaths: []string{"/.fonts"},
+		Files:     map[string][]byte{"/fonts/test.ttf": []byte("fake-font"), "/data.json": []byte("{}")},
+		FontPaths: []string{"/fonts"},
 		Inputs:    map[string]string{"version": "1.2.0"},
 	})
 	if err != nil {
@@ -79,23 +91,14 @@ func TestRenderPassesFontPathsAndInputs(t *testing.T) {
 	}
 }
 
-func TestRenderRejectsBadBase64(t *testing.T) {
-	t.Setenv("TYPST_BIN", writeStub(t, `echo -n pdf > out.pdf`))
-
-	_, err := render(renderReq{Template: "= hi", Files: map[string]string{"/data.json": "!!!not-base64"}})
-	if err == nil || !strings.Contains(err.Error(), "base64") {
-		t.Fatalf("render() error = %v, want base64 rejection", err)
-	}
-}
-
 func TestRenderTimeout(t *testing.T) {
-	t.Setenv("TYPST_BIN", writeStub(t, `exec sleep 5`))
+	r := newTestRenderer(t, `exec sleep 5`)
 
 	ms := int64(1000)
 	start := time.Now()
-	_, err := render(renderReq{Template: "= hi", TimeoutMs: &ms})
+	_, err := r.Render(Request{Template: "= hi", TimeoutMs: &ms})
 	if err == nil || !strings.Contains(err.Error(), "timed out") {
-		t.Fatalf("render() error = %v, want timeout", err)
+		t.Fatalf("Render() error = %v, want timeout", err)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Fatalf("timeout took %s, want ~1s", elapsed)
@@ -108,14 +111,14 @@ func TestTimeoutFor(t *testing.T) {
 		ms   *int64
 		want time.Duration
 	}{
-		{"default", nil, defaultTimeout},
-		{"clamped low", ptr(int64(10)), defaultTimeout},
-		{"clamped high", ptr(int64(999_999)), defaultTimeout},
+		{"default", nil, DefaultTimeout},
+		{"clamped low", ptr(int64(10)), DefaultTimeout},
+		{"clamped high", ptr(int64(999_999)), DefaultTimeout},
 		{"explicit", ptr(int64(5000)), 5 * time.Second},
 	}
 	for _, tc := range cases {
-		if got := timeoutFor(renderReq{TimeoutMs: tc.ms}); got != tc.want {
-			t.Errorf("%s: timeoutFor() = %s, want %s", tc.name, got, tc.want)
+		if got := TimeoutFor(Request{TimeoutMs: tc.ms}); got != tc.want {
+			t.Errorf("%s: TimeoutFor() = %s, want %s", tc.name, got, tc.want)
 		}
 	}
 }
