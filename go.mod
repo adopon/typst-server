@@ -1,3 +1,3 @@
-module ponado-typst
+module typst-server
 
 go 1.24

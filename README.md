@@ -1,27 +1,33 @@
-# ponado-typst
+# typst-server
 
-Shared Typst -> PDF renderer for ponado apps - "Gotenberg, but only for Typst".
+Self-hosted Typst -> PDF renderer - "Gotenberg, but only for Typst".
 
-One small Go service (stdlib only) wrapping the prebuilt `typst` CLI. Apps
+One small Go service (stdlib only) wrapping the prebuilt `typst` CLI. Clients
 POST a template over HTTP and get a PDF back, so no project has to bundle
 `@myriaddreamin/typst-ts-node-compiler` (tens of MB of wasm/native glue) into
 its server build.
 
 ```
-app (SvelteKit)  --HTTP POST /render-->  ponado-typst  --fork-->  typst compile
+client  --HTTP POST /render-->  typst-server  --fork-->  typst compile
 ```
 
 ## Quick start
 
 ```bash
-docker compose up -d --build          # serves on :3100, joins the `ponado` network
-curl -s localhost:3100/health         # ok
+docker compose up -d                                # pull the prebuilt image, serve on :3100
+docker compose -f compose.build.yml up -d --build   # or build the local tree instead
+curl -s localhost:3100/health                       # ok
 ```
+
+`compose.yml` is the copy-pasteable, production one: it only pulls the
+published image (`compose.yml` picks up `TYPST_IMAGE` if you publish to a
+different registry/tag). `compose.build.yml` is the local-build variant used
+during development.
 
 Build + push a multi-arch image:
 
 ```bash
-scripts/build-push.sh                 # git.ponado.lt/ponado/ponado-typst:{tag,latest}
+IMAGE=registry.example.com/you/typst-server scripts/build-push.sh   # :{tag,latest}
 TAG=v0.1.1 PUSH=0 scripts/build-push.sh
 ```
 
@@ -41,9 +47,9 @@ For CI or several build machines, export the cache to the registry (needs a
 `docker-container` builder - the default docker driver cannot export caches):
 
 ```bash
-docker buildx create --name ponado --driver docker-container --use
-CACHE_TO=type=registry,ref=git.ponado.lt/ponado/ponado-typst:buildcache,mode=max \
-CACHE_FROM=type=registry,ref=git.ponado.lt/ponado/ponado-typst:buildcache \
+docker buildx create --name typst --driver docker-container --use
+CACHE_TO=type=registry,ref=registry.example.com/you/typst-server:buildcache,mode=max \
+CACHE_FROM=type=registry,ref=registry.example.com/you/typst-server:buildcache \
   scripts/build-push.sh
 ```
 
@@ -61,11 +67,11 @@ scripts/release.sh       bump + commit + tag + push + build
 
 ## API
 
-| Method | Path       | Returns                                            |
-| ------ | ---------- | -------------------------------------------------- |
-| GET    | `/health`  | `ok` (plain text)                                  |
-| GET    | `/version` | `{"service","version","go","typst"}`               |
-| POST   | `/render`  | `application/pdf`, or `application/json` on error  |
+| Method | Path       | Returns                                           |
+| ------ | ---------- | ------------------------------------------------- |
+| GET    | `/health`  | `ok` (plain text)                                 |
+| GET    | `/version` | `{"service","version","go","typst"}`              |
+| POST   | `/render`  | `application/pdf`, or `application/json` on error |
 
 `POST /render` accepts two encodings of the same request.
 
@@ -92,7 +98,7 @@ scripts/release.sh       bump + commit + tag + push + build
 ```bash
 # JSON
 curl -s localhost:3100/render -H 'content-type: application/json' \
-  -d '{"template":"= Ponado typst\nHello from the shared service."}' -o hello.pdf
+  -d '{"template":"= typst-server\nHello from the shared service."}' -o hello.pdf
 
 # multipart (binary files)
 curl -s localhost:3100/render \
@@ -112,9 +118,9 @@ curl -s localhost:3100/render \
 
 Fonts live in the container - clients never upload them:
 
-1. **Baked baseline** - Liberation Sans is installed in the image (invoice and
-   certificate templates rely on it; typst's embedded Libertinus alone is not
-   enough).
+1. **Baked baseline** - Liberation Sans is installed in the image (templates
+   that need a common sans fallback rely on it; typst's embedded Libertinus
+   alone is not enough).
 2. **Shared pool** - every `.ttf`/`.otf` under the mounted font dir
    (`TYPST_FONTS_DIR`, default `./fonts`) is visible to all renders:
 
@@ -140,35 +146,25 @@ shared across apps.
 
 ## Connecting apps
 
-The service joins a fixed-name docker network `ponado`, so another compose
+The service joins a fixed-name docker network (`typst`), so another compose
 project reaches it without publishing ports:
 
 ```yaml
 services:
   app:
     environment:
-      TYPST_URL: http://ponado-typst:3100
-    networks: [ponado]
+      TYPST_URL: http://typst-server:3100
+    networks: [typst]
 
 networks:
-  ponado:
+  typst:
     external: true
 ```
 
-Without the shared network, point `TYPST_URL` at the published port
-(`http://<host>:3100`).
+Override the network name with `TYPST_NETWORK`. Without the shared network,
+point clients at the published port (`http://<host>:3100`) instead.
 
-In SvelteKit code the ponado clients read `TYPST_URL` from the server
-environment:
-
-- `#ponado/typst/typst.server.js` (registry block) - HTTP-backed
-  `TypstRenderer`. Sends multipart by default, takes optional per-render
-  `files` (flat names) and `inputs`; fonts come from the service pool.
-  `convertToPdf` / `renderWithData` signatures are unchanged.
-- `@ponado/document-utils/server` - same contract for the npm package.
-
-When `TYPST_URL` is missing, renders fail at call time with a clear error (the
-module can still be imported at build time).
+Any HTTP client works: POST to `/render` with either encoding above.
 
 ## Versioning & releases
 
@@ -193,6 +189,10 @@ DRY_RUN=1 scripts/release.sh patch  # preview the actions
 
 ## Compatibility
 
-The `/render` contract is a superset of the algis `pdf-worker` contract
+The `/render` contract is a superset of the minimal pdf-worker contract
 (`template`, `mainFilePath`, `files`, `timeoutMs`), so existing callers can
 switch by changing the base URL alone.
+
+## License
+
+MIT - see [LICENSE](LICENSE).

@@ -1,0 +1,50 @@
+name: typst-server
+
+# Self-hosted Typst -> PDF renderer ("Gotenberg for Typst") - prebuilt image.
+# One instance serves every project; clients call it over HTTP instead of
+# bundling the typst compiler (e.g. @myriaddreamin/typst-ts-node-compiler).
+#
+# Copy-paste friendly: no local source needed, just pulls the published image.
+#
+#   docker compose up -d              # pull + run
+#   TYPST_IMAGE=... docker compose up -d
+#
+# Reachable as http://typst-server:3100 from the shared `typst` docker
+# network, or via the published port on the host (TYPST_PORT, default 3100).
+#
+# To build the image from local source instead, run:
+#   docker compose -f compose.build.yml up -d --build
+
+services:
+  typst-server:
+    # Override the whole ref (registry + tag) with TYPST_IMAGE when pulling
+    # from a different registry or a pinned release.
+    image: ${TYPST_IMAGE:-git.ponado.lt/ponado/typst-server:latest}
+    container_name: typst-server
+    restart: unless-stopped
+    ports:
+      - "${TYPST_PORT:-3100}:3100"
+    environment:
+      # Parallel typst compiles. Empty -> NumCPU, <=0 -> unlimited.
+      MAX_CONCURRENCY: ${MAX_CONCURRENCY:-}
+      # Request body cap in MB (base64 shadow files + uploaded fonts).
+      MAX_BODY_MB: ${MAX_BODY_MB:-25}
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Shared font pool: every .ttf/.otf in here is visible to all renders.
+      - ${TYPST_FONTS_DIR:-./fonts}:/app/fonts:ro
+    networks:
+      - typst
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  # Lookup-or-create by fixed name: other compose projects join with
+  #   networks: { typst: { external: true } }
+  # Override the network name with TYPST_NETWORK to attach to an existing one.
+  typst:
+    name: ${TYPST_NETWORK:-typst}

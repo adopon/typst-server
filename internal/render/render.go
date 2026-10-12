@@ -103,7 +103,7 @@ func (r *Renderer) Render(req Request) ([]byte, error) {
 	}
 	defer r.release()
 
-	dir, err := os.MkdirTemp("", "ponado-typst-")
+	dir, err := os.MkdirTemp("", "typst-server-")
 	if err != nil {
 		return nil, fmt.Errorf("temp dir: %w", err)
 	}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cut a ponado-typst release: bump VERSION, commit, tag vX.Y.Z, push both, then
+# Cut a typst-server release: bump VERSION, commit, tag vX.Y.Z, push both, then
 # build + push the image. VERSION is the single source of truth - the git tag
 # and the image tag follow it (scripts/build-push.sh reads the same file).
 #

@@ -1,7 +1,7 @@
-// Package server exposes the HTTP surface of ponado-typst:
+// Package server exposes the HTTP surface of typst-server:
 //
 //	GET  /health  -> "ok"
-//	GET  /version -> {"service":"ponado-typst","go":"go1.x","typst":"typst 0.15.1"}
+//	GET  /version -> {"service":"typst-server","go":"go1.x","typst":"typst 0.15.1"}
 //	POST /render  -> application/pdf | application/json error
 //
 // POST /render accepts both application/json (files base64-encoded) and
@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"ponado-typst/internal/render"
+	"typst-server/internal/render"
 )
 
 // Name is the service name reported by /version and used in logs.
-const Name = "ponado-typst"
+const Name = "typst-server"
 
 // Renderer is the compile backend; internal/render satisfies it.
 type Renderer interface {
@@ -31,7 +31,7 @@ type Renderer interface {
 
 // Options configures a Server.
 type Options struct {
-	// ServiceVersion is the ponado-typst release (set at build time via
+	// ServiceVersion is the typst-server release (set at build time via
 	// -ldflags "-X main.version=..."); informational only.
 	ServiceVersion string
 	// TypstVersion is the engine banner; informational (/version, logs).

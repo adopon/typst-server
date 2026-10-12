@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# ponado-typst: Go handler (stdlib only) + prebuilt typst CLI.
+# typst-server: Go handler (stdlib only) + prebuilt typst CLI.
 #
 # Nothing heavy is compiled on the build machine: the Go handler builds in
 # seconds and the typst engine is copied from the official image. TYPST_VERSION
@@ -27,15 +27,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
-    -o ponado-typst .
+    -o typst-server .
 
 FROM ghcr.io/typst/typst:${TYPST_VERSION} AS typst
 
 FROM alpine:3.20
 ARG VERSION
-LABEL org.opencontainers.image.title="ponado-typst" \
-    org.opencontainers.image.description="Shared Typst to PDF renderer" \
-    org.opencontainers.image.source="https://git.ponado.lt/ponado/ponado-typst" \
+LABEL org.opencontainers.image.title="typst-server" \
+    org.opencontainers.image.description="Self-hosted Typst to PDF render service" \
     org.opencontainers.image.version="${VERSION}"
 # Font discovery: XDG_DATA_HOME=/app makes typst scan /app/fonts, which is the
 # mount point for the shared font pool. HOME=/tmp gives the non-root user a
@@ -48,9 +47,9 @@ RUN apk add --no-cache font-liberation \
     && mkdir -p /app/fonts \
     && chmod 1777 /tmp
 COPY --from=typst /bin/typst /usr/local/bin/typst
-COPY --from=builder /app/ponado-typst /usr/local/bin/ponado-typst
+COPY --from=builder /app/typst-server /usr/local/bin/typst-server
 USER 65534:65534
 EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3100/health || exit 1
-ENTRYPOINT ["/usr/local/bin/ponado-typst"]
+ENTRYPOINT ["/usr/local/bin/typst-server"]

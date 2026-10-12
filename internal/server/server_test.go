@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"ponado-typst/internal/render"
+	"typst-server/internal/render"
 )
 
 type fakeRenderer struct {

@@ -1,4 +1,4 @@
-// Package config loads ponado-typst settings from the environment.
+// Package config loads typst-server settings from the environment.
 package config
 
 import (

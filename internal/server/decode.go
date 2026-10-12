@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ponado-typst/internal/render"
+	"typst-server/internal/render"
 )
 
 // multipartMemory caps the RAM used while parsing multipart bodies; larger

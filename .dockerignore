@@ -2,6 +2,6 @@
 .gitignore
 fonts
 scripts
-docker-compose.yml
+compose.*.yml
 README.md
 main_test.go

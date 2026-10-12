@@ -1,4 +1,4 @@
-// Command ponado-typst serves the shared Typst -> PDF renderer
+// Command typst-server serves the shared Typst -> PDF renderer
 // ("Gotenberg, but only for Typst"). The wire contract and deployment notes
 // live in README.md; the implementation is split into:
 //
@@ -11,12 +11,12 @@ import (
 	"log"
 	"net/http"
 
-	"ponado-typst/internal/config"
-	"ponado-typst/internal/render"
-	"ponado-typst/internal/server"
+	"typst-server/internal/config"
+	"typst-server/internal/render"
+	"typst-server/internal/server"
 )
 
-// version is the ponado-typst release; set via
+// version is the typst-server release; set via
 // -ldflags "-X main.version=..." at image build time.
 var version = "dev"
 

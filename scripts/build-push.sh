@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build + push the ponado-typst image (multi-arch).
+# Build + push the typst-server image (multi-arch).
 #
 # Inputs (env or .env.local):
-#   IMAGE          full image ref (default: git.ponado.lt/ponado/ponado-typst)
+#   IMAGE          full image ref (default: typst-server; set this to a
+#                  registry path like registry.example.com/you/typst-server
+#                  before PUSH=1)
 #   TAG            image tag (default: ./VERSION, then git describe, then latest)
 #   PLATFORMS      buildx platforms (default: linux/amd64,linux/arm64)
 #   PUSH           "1" (default) push, "0" build locally with --load
@@ -28,7 +30,7 @@ set -a
 source "$DIR/.env.local" 2>/dev/null || true
 set +a
 
-IMAGE="${IMAGE:-git.ponado.lt/ponado/ponado-typst}"
+IMAGE="${IMAGE:-typst-server}"
 VERSION_FILE="$(tr -d '[:space:]' < "$DIR/VERSION" 2>/dev/null || true)"
 TAG="${1:-${TAG:-${VERSION_FILE:-$(git describe --tags --always --dirty 2>/dev/null || echo latest)}}}"
 PUSH="${PUSH:-1}"
