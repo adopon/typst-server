@@ -48,3 +48,4 @@ networks:
   # Override the network name with TYPST_NETWORK to attach to an existing one.
   typst:
     name: ${TYPST_NETWORK:-typst}
+

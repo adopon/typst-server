@@ -1,5 +1,5 @@
-# local overrides for scripts/build-push.sh
-.env.local
+# Node tooling for @ponado/docker-image only; the service is pure Go
+node_modules/
 
 # shared font pool is host-provided, keep the mount point in git
 fonts/*

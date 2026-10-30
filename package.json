@@ -1,0 +1,36 @@
+{
+	"name": "typst-server",
+	"version": "0.1.2",
+	"private": true,
+	"packageManager": "pnpm@12.15.0",
+	"scripts": {
+		"release:check": "test \"$(git branch --show-current)\" = main",
+		"release": "pnpm release:check && bumpp --git-check --yes && pnpm exec ponado-docker-image --mode prod",
+		"release:patch": "pnpm release:check && bumpp patch --git-check --yes && pnpm exec ponado-docker-image --mode prod",
+		"release:minor": "pnpm release:check && bumpp minor --git-check --yes && pnpm exec ponado-docker-image --mode prod",
+		"release:major": "pnpm release:check && bumpp major --git-check --yes && pnpm exec ponado-docker-image --mode prod"
+	},
+	"devDependencies": {
+		"@ponado/docker-image": "^0.4.0",
+		"bumpp": "^12.3.0"
+	},
+	"dockerImage": {
+		"platforms": ["linux/amd64", "linux/arm64"],
+		"buildArgs": {
+			"VERSION": "{version}"
+		},
+		"modes": {
+			"prod": {
+				"targets": [
+					"git.ponado.lt/ponado/typst-server",
+					"ghcr.io/adopon/typst-server"
+				],
+				"branch": "main",
+				"requireTag": true
+			},
+			"dev": {
+				"targets": ["typst-server"]
+			}
+		}
+	}
+}

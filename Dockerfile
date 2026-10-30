@@ -6,13 +6,13 @@
 # is pinned for reproducible builds - PDF output can change between typst
 # releases, so bump it deliberately (and update the README).
 ARG TYPST_VERSION=0.15.1
-# Service release tag; scripts/build-push.sh passes VERSION (from ./VERSION).
+# Service release tag; the shared build CLI passes VERSION from package.json.
 ARG VERSION=dev
 
 # The handler cross-compiles for the target (CGO off, pure Go), so foreign
 # archs need no QEMU emulation: on an amd64 host an arm64 image compiles
 # natively for arm64 instead of running the whole toolchain under emulation.
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION
@@ -31,11 +31,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM ghcr.io/typst/typst:${TYPST_VERSION} AS typst
 
-FROM alpine:3.20
+FROM alpine:3.24
 ARG VERSION
 LABEL org.opencontainers.image.title="typst-server" \
     org.opencontainers.image.description="Self-hosted Typst to PDF render service" \
-    org.opencontainers.image.version="${VERSION}"
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.source="https://github.com/adopon/typst-server" \
+    org.opencontainers.image.licenses="MIT"
 # Font discovery: XDG_DATA_HOME=/app makes typst scan /app/fonts, which is the
 # mount point for the shared font pool. HOME=/tmp gives the non-root user a
 # writable cache dir if a template ever pulls a package.

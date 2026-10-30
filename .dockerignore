@@ -1,7 +1,9 @@
 .git
 .gitignore
+node_modules
+package.json
+pnpm-lock.yaml
 fonts
-scripts
 compose.*.yml
 README.md
 main_test.go

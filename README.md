@@ -21,15 +21,66 @@ curl -s localhost:3100/health                       # ok
 
 `compose.yml` is the copy-pasteable, production one: it only pulls the
 published image (`compose.yml` picks up `TYPST_IMAGE` if you publish to a
-different registry/tag). `compose.build.yml` is the local-build variant used
-during development.
-
-Build + push a multi-arch image:
+different registry/tag). Published to both the internal registry and GHCR:
 
 ```bash
-IMAGE=registry.example.com/you/typst-server scripts/build-push.sh   # :{tag,latest}
-TAG=v0.1.1 PUSH=0 scripts/build-push.sh
+docker compose up -d
+TYPST_IMAGE=ghcr.io/adopon/typst-server:latest docker compose up -d
 ```
+
+`compose.build.yml` is the local-build variant used during development.
+
+Build + push a multi-arch image (internal registry **and** GHCR from one build):
+
+```bash
+pnpm install                                        # once; installs @ponado/docker-image
+pnpm exec ponado-docker-image --mode prod           # v0.1.2, v0.1, latest, sha-<short>
+pnpm exec ponado-docker-image --mode prod --dry-run # print tags + commands
+```
+
+There is no per-repo build script: all tag/mirror/platform policy lives in
+`package.json` → `dockerImage`, and the shared CLI is the only entry point. The
+first target is built once and the GHCR mirror is copied from it with
+`docker buildx imagetools create`, so both registries get the same digest.
+
+Overrides go straight to the CLI:
+
+```bash
+pnpm exec ponado-docker-image --mode prod --image registry.example.com/you/typst-server --no-mirror
+pnpm exec ponado-docker-image --mode prod --tag v0.1.2-rc.1
+pnpm exec ponado-docker-image build --mode dev --no-push   # local --load
+pnpm exec ponado-docker-image                             # interactive
+```
+
+The prod mode refuses a dirty tree, a non-`main` branch, or a HEAD that is
+not tagged `v<version>`. For a scratch build add
+`--allow-dirty --allow-untagged --allow-branch`, or use `--mode dev`.
+
+GHCR auth needs a **classic** personal access token with `write:packages`
+(fine-grained tokens are not supported by GitHub Packages). Create one with only
+that scope, avoiding the `repo` scope the UI adds by default:
+
+<https://github.com/settings/tokens/new?scopes=write:packages>
+
+Then log in (keep the token in your password manager, not in the repo):
+
+```bash
+export CR_PAT=ghp_...
+echo "$CR_PAT" | docker login ghcr.io -u adopon --password-stdin
+```
+
+The `gh` CLI token also works if you refresh it with the scope
+(`gh auth refresh -h github.com -s write:packages`), but a dedicated PAT keeps
+Docker's stored credential separate from your `gh` session.
+
+The resulting package is private by default; make it public in the package
+settings if `docker pull` should work without a login.
+
+A PAT push creates a **user-scoped** package (`github.com/adopon?tab=packages`),
+so it does not appear under the repository's Packages tab until it is linked.
+The first time, link it manually: package settings → *Connect repository* →
+`adopon/typst-server`. New packages pick this up automatically from the
+`org.opencontainers.image.source` label in the Dockerfile.
 
 ## Build caching
 
@@ -48,9 +99,9 @@ For CI or several build machines, export the cache to the registry (needs a
 
 ```bash
 docker buildx create --name typst --driver docker-container --use
-CACHE_TO=type=registry,ref=registry.example.com/you/typst-server:buildcache,mode=max \
-CACHE_FROM=type=registry,ref=registry.example.com/you/typst-server:buildcache \
-  scripts/build-push.sh
+pnpm exec ponado-docker-image --mode prod \
+  --cache-to type=registry,ref=registry.example.com/you/typst-server:buildcache,mode=max \
+  --cache-from type=registry,ref=registry.example.com/you/typst-server:buildcache
 ```
 
 ## Layout
@@ -60,9 +111,7 @@ main.go                  wiring only (config -> renderer -> server)
 internal/config/         environment parsing
 internal/render/         typst invocation, shadow dirs, timeouts, concurrency
 internal/server/         HTTP handlers + JSON/multipart request decoding
-VERSION                  service version - image tag source of truth
-scripts/build-push.sh    multi-arch image build/push
-scripts/release.sh       bump + commit + tag + push + build
+package.json             version, dockerImage policy, release scripts
 ```
 
 ## API
@@ -170,21 +219,30 @@ Any HTTP client works: POST to `/render` with either encoding above.
 
 Two independent versions:
 
-- **Service version** - `VERSION` at the repo root is the single source of
-  truth. `scripts/build-push.sh` uses it for the image tag (override with
-  `TAG=...`) and bakes it into the binary and the OCI label, so `/version`
-  reports the exact build.
+- **Service version** - `package.json` `version` is the single source of truth.
+  The shared build CLI tags the image `v<version>` and bakes the version into
+  the binary and the OCI label, so `/version` reports the exact build. Image
+  tags follow the shared policy: `vX.Y.Z`, `vX.Y`, `latest`, `sha-<short>`.
 - **Engine version** - `TYPST_VERSION` (Dockerfile `ARG`, default `0.15.1`)
   pins the typst CLI. PDF output can change between typst releases, so bump it
-  deliberately: `TYPST_VERSION=0.16.0 scripts/build-push.sh`.
+  deliberately:
+  `pnpm exec ponado-docker-image --mode prod --build-arg TYPST_VERSION=0.16.0`.
 
-Cut a release - bumps VERSION, commits, tags `vX.Y.Z`, pushes both, then
-builds and pushes the image:
+Cut a release with `bumpp` (bumps `package.json`, commits, tags `vX.Y.Z`,
+pushes), then the same command builds and pushes the image:
 
 ```bash
-scripts/release.sh patch            # or minor|major, or an explicit 1.2.3
-BUILD=0 scripts/release.sh patch    # git release only
-DRY_RUN=1 scripts/release.sh patch  # preview the actions
+pnpm release:patch     # or release:minor / release:major
+pnpm release           # choose the bump interactively
+```
+
+Both refuse a non-`main` branch and `bumpp --git-check` refuses a dirty tree
+before anything is tagged. To do the git step only:
+
+```bash
+pnpm exec bumpp patch --git-check --yes
+# later, after reviewing the pushed tag
+pnpm exec ponado-docker-image --mode prod
 ```
 
 ## Compatibility
